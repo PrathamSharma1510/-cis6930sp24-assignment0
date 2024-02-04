@@ -2,12 +2,14 @@
 import argparse
 import urllib.request
 import os
-import PyPDF2
+from PyPDF2 import PdfReader
+import re
+import sqlite3
 # from assignment0 import datafetch as data_fetch
 def fetchincidents(url):
     # Specify the user agent to avoid blocking by some websites
-    url = ("https://www.normanok.gov/sites/default/files/documents/"
-       "2024-01/2024-01-01_daily_incident_summary.pdf")
+    # url = ("https://www.normanok.gov/sites/default/files/documents/"
+    #    "2024-01/2024-01-01_daily_incident_summary.pdf")
     headers = {'User-Agent': "Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.27 Safari/537.17"}
 
     # Create a request object with the given URL and headers
@@ -23,33 +25,88 @@ def fetchincidents(url):
     # Write the downloaded PDF to a file
     with open(file_path, 'wb') as file:
         file.write(data)
-    # Read the PDF content using PyPDF2
-    with open(file_path, 'rb') as file:
-        pdf_reader = PyPDF2.PdfReader(file)
-        text_content = []
         
-        for page_num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[page_num]
-            text_content.append(page.extract_text())
-        
-        # Combine the text from all pages into a single string
-        all_text = '\n'.join(text_content)
-        
-        # Print the first 500 characters to verify
-        print(all_text[:500])
-    # Return the path of the saved file for further processing
     return file_path
+def extract_incidents(pdf_path):
+    reader = PdfReader(pdf_path)
+    text = reader.pages[0].extract_text()
+    # print(text)
+    incidents = []
+
+    
+    pattern = re.compile(r'(\d+/\d+/\d+ \d+:\d+) (\d{4}-\d{8}) (.*?) (Traffic Stop|Chest Pain|Sick Person|Motorist Assist|Burglary|Shots Heard|Alarm|Disturbance/Domestic|Fire Dumpster|Shooting Stabbing Penetrating) ([A-Z0-9]+)$', re.IGNORECASE)
+
+    for page in reader.pages:
+        text = page.extract_text()
+        lines = text.split('\n')
+        
+        for line in lines:
+            match = pattern.search(line)
+            if match:
+                incidents.append({
+                    'date_time': match.group(1),
+                    'incident_number': match.group(2),
+                    'location': match.group(3).strip(),
+                    'nature': match.group(4).strip(),
+                    'incident_ori': match.group(5)
+                })
+
+    # for incident in incidents:
+    #     print(incident)
+    return incidents
+
+def createdb(db_path):
+    # Connect to the SQLite database. This will create the database file if it doesn't exist
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+
+    # Create the incidents table
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS incidents (
+        incident_time TEXT,
+        incident_number TEXT,
+        incident_location TEXT,
+        nature TEXT,
+        incident_ori TEXT
+    );
+    ''')
+
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+    
+def populate_db(db_path, incidents):
+    # Connect to the SQLite database
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+
+    # Insert each incident into the incidents table
+    for incident in incidents:
+        c.execute('''
+        INSERT INTO incidents (incident_time, incident_number, incident_location, nature, incident_ori)
+        VALUES (?, ?, ?, ?, ?);
+        ''', (incident['date_time'], incident['incident_number'], incident['location'], incident['nature'], incident['incident_ori']))
+
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+
 def main(url):
     # Download data
+    db_path = 'resources/normanpd.db'  # Make sure this path is correct
+    
+    # Ensure the resources directory exists
+    if not os.path.exists('resources'):
+        os.makedirs('resources')
     incident_data = fetchincidents(url)
     # Extract data
-    # incidents = assignment0.extract_incidents(incident_data)
+    incidents = extract_incidents(incident_data)
     
     # # Create new database
-    # db = assignment0.create_db()
+    db = createdb(db_path)
     
     # # Insert data
-    # assignment0.populate_db(db, incidents)
+    populate_db(db_path, incidents)
     
     # # Print incident counts
     # assignment0.print_status(db)
