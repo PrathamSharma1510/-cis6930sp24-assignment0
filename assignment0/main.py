@@ -4,7 +4,9 @@ import urllib.request
 import os
 from PyPDF2 import PdfReader
 import re
+import fitz # PyMuPDF
 import sqlite3
+import pandas as pd
 # from assignment0 import datafetch as data_fetch
 def fetchincidents(url):
     # Specify the user agent to avoid blocking by some websites
@@ -28,72 +30,152 @@ def fetchincidents(url):
         
     return file_path
 def extract_incidents(pdf_path):
-    reader = PdfReader(pdf_path)
-    text = reader.pages[0].extract_text()
-    # print(text)
-    incidents = []
+    doc = fitz.open("/tmp/incident_report.pdf")
+
+    all_text = ""
+    for page in doc:
+        all_text += page.get_text()
+
+    doc.close()
+
+    lines = all_text.split('\n')
+
+    date_times, incident_numbers, locations, natures, incident_oris = [], [], [], [], []
+
+    for i in range(0, len(lines)):
+        if 'Date / Time' in lines[i]: 
+            continue
+        
+        if i + 4 < len(lines) and '/' in lines[i] and ':' in lines[i]:
+            date_times.append(lines[i].strip())
+            incident_numbers.append(lines[i + 1].strip())
+            locations.append(lines[i + 2].strip())
+            natures.append(lines[i + 3].strip())
+            incident_oris.append(lines[i + 4].strip())
 
     
-    pattern = re.compile(r'(\d+/\d+/\d+ \d+:\d+) (\d{4}-\d{8}) (.*?) (Traffic Stop|Chest Pain|Sick Person|Motorist Assist|Burglary|Shots Heard|Alarm|Disturbance/Domestic|Fire Dumpster|Shooting Stabbing Penetrating) ([A-Z0-9]+)$', re.IGNORECASE)
+    df = pd.DataFrame({
+        'Date/Time': date_times,
+        'Incident Number': incident_numbers,
+        'Location': locations,
+        'Nature': natures,
+        'Incident ORI': incident_oris
+    })
 
-    for page in reader.pages:
-        text = page.extract_text()
-        lines = text.split('\n')
+    return df
+    # reader = PdfReader(pdf_path)
+    # text = reader.pages[0].extract_text()
+    # # print(text)
+    # incidents = []
+    # reader = PdfReader(pdf_path)
+    # incidents = []
+
+    # # Assuming 'incident_ori' has a recognizable pattern, like a set of alphanumeric characters.
+    # # This pattern is designed to be more forgiving by capturing any text for the 'nature'
+    # # until it encounters a known pattern for 'incident_ori'.
+    # pattern = re.compile(r'(\d+/\d+/\d+ \d+:\d+) (\d{4}-\d{8}) (.*?) ([\w\s]+) ([A-Z0-9]{8})$', re.IGNORECASE)
+
+    # for page in reader.pages:
+    #     text = page.extract_text()
+    #     lines = text.split('\n')
         
-        for line in lines:
-            match = pattern.search(line)
-            if match:
-                incidents.append({
-                    'date_time': match.group(1),
-                    'incident_number': match.group(2),
-                    'location': match.group(3).strip(),
-                    'nature': match.group(4).strip(),
-                    'incident_ori': match.group(5)
-                })
+    #     for line in lines:
+    #         match = pattern.search(line)
+    #         if match:
+    #             incidents.append({
+    #                 'date_time': match.group(1),
+    #                 'incident_number': match.group(2),
+    #                 'location': match.group(3).strip(),
+    #                 # The nature is now more flexibly captured
+    #                 'nature': match.group(4).strip(),
+    #                 'incident_ori': match.group(5)
+    #             })
 
-    # for incident in incidents:
-    #     print(incident)
-    return incidents
+    # return incidents
 
 def createdb(db_path):
-    # Connect to the SQLite database. This will create the database file if it doesn't exist
+  # Connect to the SQLite database or create a new one if it doesn't exist
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-
-    # Create the incidents table
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS incidents (
-        incident_time TEXT,
-        incident_number TEXT,
-        incident_location TEXT,
-        nature TEXT,
-        incident_ori TEXT
-    );
-    ''')
+    
+    # Check if the "incidents" table exists in the database
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='incidents';")
+    table_exists = c.fetchone()
+    
+    if not table_exists:
+        # Create the incidents table if it doesn't exist
+        c.execute('''
+        CREATE TABLE incidents (
+            incident_time TEXT,
+            incident_number TEXT,
+            incident_location TEXT,
+            nature TEXT,
+            incident_ori TEXT
+        );
+        ''')
 
     # Commit the changes and close the connection
     conn.commit()
     conn.close()
     
-def populate_db(db_path, incidents):
-    # Connect to the SQLite database
+def populate_db(db_path, df):
+    # Connect to the SQLite database using the correct db_path
     conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-
-    # Insert each incident into the incidents table
-    for incident in incidents:
-        c.execute('''
-        INSERT INTO incidents (incident_time, incident_number, incident_location, nature, incident_ori)
-        VALUES (?, ?, ?, ?, ?);
-        ''', (incident['date_time'], incident['incident_number'], incident['location'], incident['nature'], incident['incident_ori']))
-
+    cur = conn.cursor()
+    
+    # Clear the existing records in the table (optional, based on your requirement)
+    cur.execute("DELETE FROM incidents")
+    
+    # Insert new records from the DataFrame
+    for _, row in df.iterrows():
+        cur.execute(
+            '''
+            INSERT INTO incidents (incident_time, incident_number, incident_location, nature, incident_ori)
+            VALUES (?, ?, ?, ?, ?)
+            ''',
+            (row['Date/Time'], row['Incident Number'], row['Location'], row['Nature'], row['Incident ORI'])
+        )
+    
     # Commit the changes and close the connection
     conn.commit()
     conn.close()
+    # conn = sqlite3.connect(db_path)
+    # c = conn.cursor()
+
+    # # Insert each incident into the incidents table
+    # for incident in incidents:
+    #     c.execute('''
+    #     INSERT INTO incidents (incident_time, incident_number, incident_location, nature, incident_ori)
+    #     VALUES (?, ?, ?, ?, ?);
+    #     ''', (incident['date_time'], incident['incident_number'], incident['location'], incident['nature'], incident['incident_ori']))
+
+    # # Commit the changes and close the connection
+    # conn.commit()
+    # conn.close()
+
+def print_status(db_path):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    query = '''
+    SELECT nature, COUNT(nature) AS cnt
+    FROM incidents
+    GROUP BY nature
+    ORDER BY cnt DESC, nature ASC;
+    '''
+    c.execute(query)
+    results = c.fetchall()
+    
+    for nature, count in results:
+        print(f'{nature}|{count}')
+    
+    conn.close()
+
 
 def main(url):
-    # Download data
-    db_path = 'resources/normanpd.db'  # Make sure this path is correct
+    # import time
+    # timestamp = time.strftime("%Y%m%d%H%M%S")
+    db_path = f'resources/normanpd.db'
+    # Download dataure this path is correct
     
     # Ensure the resources directory exists
     if not os.path.exists('resources'):
@@ -109,7 +191,7 @@ def main(url):
     populate_db(db_path, incidents)
     
     # # Print incident counts
-    # assignment0.print_status(db)
+    print_status(db_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Process incident data.")
