@@ -4,10 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-urllib3 = "*"
+pyarrow = "*"
+pandas = "*"
+pymupdf = "*"
 pypdf2 = "*"
-"pdfminer.six" = "*"
-tabula-py = "*"
+requests = "*"
+pip = "*"
+pypdf = "*"
+pytest = "*"
 
 [dev-packages]
 
