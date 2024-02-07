@@ -70,11 +70,5 @@ While working on this project, I dived deep into the specifics of how incident d
 
 ## Demo
 
-<object width="425" height="350">
-  <param name="movie" value="https://www.youtube.com/watch?v=SS5tU8QzhZ4&feature=youtu.be" />
-  <param name="wmode" value="transparent" />
-  <embed src="https://www.youtube.com/watch?v=SS5tU8QzhZ4&feature=youtu.be"
-         type="application/x-shockwave-flash"
-         wmode="transparent" width="425" height="350" />
-</object>
+[![Demo Video](https://img.youtube.com/vi/SS5tU8QzhZ4/0.jpg)](https://www.youtube.com/watch?v=SS5tU8QzhZ4)
 ---
