@@ -15,23 +15,27 @@ Ensure that you have a `pipenv` installed. If not, install it using command :- `
 pipenv install
 ```
 
-## How to Run the code 
+## How to Run the code
 
 To execute the code following command is used:
 
 ```
 pipenv run python main.py --incidents [PDF URL]
 ```
+
 Some example:-
 **Example 1**:
+
 ```
 pipenv run python assignment0/main.py --incidents "https://www.normanok.gov/sites/default/files/documents/2024-01/2024-01-04_daily_incident_summary.pdf"
 ```
 
 **Example 2**:
+
 ```
 pipenv run python assignment0/main.py --incidents "https://www.normanok.gov/sites/default/files/documents/2024-01/2024-01-20_daily_incident_summary.pdf"
 ```
+
 ## Functions Overview
 
 - **download_pdf(url, save_path)**: Facilitates the automated retrieval of PDF documents from specified web URLs. It saves the downloaded file to a local path, ensuring that the incident reports are accessible for data extraction.
@@ -66,6 +70,11 @@ While working on this project, I dived deep into the specifics of how incident d
 
 ## Demo
 
-Include a GIF or a video link demonstrating the tool in action.
-
+<object width="425" height="350">
+  <param name="movie" value="https://www.youtube.com/watch?v=SS5tU8QzhZ4&feature=youtu.be" />
+  <param name="wmode" value="transparent" />
+  <embed src="https://www.youtube.com/watch?v=SS5tU8QzhZ4&feature=youtu.be"
+         type="application/x-shockwave-flash"
+         wmode="transparent" width="425" height="350" />
+</object>
 ---
